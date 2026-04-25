@@ -78,6 +78,10 @@ const TICK_MS = 1000; // Tick interval for stale checks + footer spinner
 const STALE_MS = 3 * 60 * 1000; // Stale timeout: 3 min for orphaned agents
 const PRUNE_MS = 2 * 60 * 1000; // Prune done/error agents after 2 min
 
+// tmux-live metadata paths
+const FORK_LIVE_REGISTRY = "/tmp/fork-live-registry";
+const FORK_LIVE_SESSIONS = "/tmp/fork-live-sessions";
+
 // ── Patterns ──────────────────────────────────────────────
 
 const IDENT = /[a-zA-Z0-9_-]+/;
@@ -269,6 +273,70 @@ export default function (pi: ExtensionAPI) {
 
 	// ── tmux-live command parsing (PRIMARY authority) ───────
 
+	/** Read model from tmux-live .meta file */
+	function readModelFromMeta(name: string): string | undefined {
+		const metaPath = path.join(FORK_LIVE_REGISTRY, `fork-${name}.meta`);
+		try {
+			if (!fs.existsSync(metaPath)) return undefined;
+			const raw = fs.readFileSync(metaPath, "utf-8");
+			const meta = JSON.parse(raw);
+			return typeof meta.model === "string" ? meta.model : undefined;
+		} catch {
+			return undefined;
+		}
+	}
+
+	/** Read usage from tmux-live session JSONL */
+	function readUsageFromSession(name: string): TokenUsage | undefined {
+		try {
+			// Find session dir: /tmp/fork-live-sessions/fork-{name}-*/
+			const dirs = fs
+				.readdirSync(FORK_LIVE_SESSIONS)
+				.filter((d) => d.startsWith(`fork-${name}-`));
+			if (dirs.length === 0) return undefined;
+
+			// Read the JSONL file in the latest session dir
+			const sessionDir = path.join(FORK_LIVE_SESSIONS, dirs[dirs.length - 1]);
+			const jsonlFiles = fs
+				.readdirSync(sessionDir)
+				.filter((f) => f.endsWith(".jsonl"));
+			if (jsonlFiles.length === 0) return undefined;
+
+			const jsonlPath = path.join(sessionDir, jsonlFiles[0]);
+			const lines = fs.readFileSync(jsonlPath, "utf-8").split("\n");
+
+			// Find last assistant message with usage
+			let lastUsage: TokenUsage | undefined;
+			for (const line of lines) {
+				if (!line.trim()) continue;
+				try {
+					const evt = JSON.parse(line);
+					if (
+						evt.type === "message" &&
+						evt.message?.role === "assistant" &&
+						evt.message?.usage
+					) {
+						const u = evt.message.usage;
+						lastUsage = {
+							input: u.input ?? u.inputTokens ?? 0,
+							output: u.output ?? u.outputTokens ?? 0,
+							cacheRead: u.cacheRead ?? u.cache_read ?? 0,
+							cacheWrite: u.cacheWrite ?? u.cache_write ?? 0,
+							cost: u.cost?.total ?? u.totalCost ?? 0,
+							contextTokens: u.contextTokens ?? 0,
+							turns: u.turns ?? 0,
+						};
+					}
+				} catch {
+					// Skip malformed lines
+				}
+			}
+			return lastUsage;
+		} catch {
+			return undefined;
+		}
+	}
+
 	function handleLaunch(cmd: string) {
 		const match = cmd.match(LAUNCH_RE);
 		if (!match) return;
@@ -280,7 +348,15 @@ export default function (pi: ExtensionAPI) {
 		if (!VALID_ROLES.includes(role.toLowerCase())) return;
 
 		addChild(state, id, name, role);
-		debugLog({ kind: "launch", role, name });
+
+		// Enrich with model from .meta (written at spawn time)
+		const model = readModelFromMeta(name);
+		if (model) {
+			const child = state.children.get(id);
+			if (child) child.model = model;
+		}
+
+		debugLog({ kind: "launch", role, name, model });
 		ensureTick();
 	}
 
@@ -294,8 +370,18 @@ export default function (pi: ExtensionAPI) {
 			? markChildError(state, id)
 			: markChildDone(state, id);
 
+		// Enrich with usage from session JSONL
 		if (changed) {
-			debugLog({ kind: "response", name, isError });
+			const child = state.children.get(id);
+			if (child) {
+				if (!child.model) {
+					const model = readModelFromMeta(name);
+					if (model) child.model = model;
+				}
+				const usage = readUsageFromSession(name);
+				if (usage) child.usage = usage;
+			}
+			debugLog({ kind: "response", name, isError, hasUsage: !!child?.usage });
 			checkTickNeeded();
 		}
 	}
@@ -345,7 +431,7 @@ export default function (pi: ExtensionAPI) {
 	}
 
 	function checkTickNeeded() {
-			const counts = getCounts(state);
+		const counts = getCounts(state);
 
 		if (counts.running === 0 && tickInterval) {
 			clearInterval(tickInterval);
@@ -398,7 +484,6 @@ export default function (pi: ExtensionAPI) {
 				debugLog({ kind: "tick.stale-cleanup" });
 				pushWidgetIfChanged(tickCtx, "tick.stale");
 			}
-
 
 			if (counts.running === 0) {
 				clearInterval(tickInterval!);
