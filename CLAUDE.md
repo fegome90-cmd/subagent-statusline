@@ -1,6 +1,6 @@
 # subagent-statusline
 
-Pi extension for monitoring sub-agent status in tmux_fork orchestration.
+Pi package for monitoring sub-agent status with flicker-free rendering.
 
 ## Stack
 
@@ -8,16 +8,29 @@ Pi extension for monitoring sub-agent status in tmux_fork orchestration.
 - `@mariozechner/pi-coding-agent` (ExtensionAPI)
 - `@mariozechner/pi-tui` (Container, Text)
 
-## Architecture
+## Structure
 
-- `index.ts` — Extension entry: event handlers, lifecycle, `/agents` command
-- `render.ts` — Pure rendering: statusline widget, full table overlay, footer
-- `state.ts` — State types and mutation helpers (no side effects)
+```
+extensions/
+  index.ts   — Extension entry: event handlers, lifecycle, /agents command
+  render.ts  — Pure rendering: statusline widget, full table overlay, footer
+  state.ts   — State types and mutation helpers (no side effects)
+  test/      — Test files
+  scripts/   — smoke-flicker.sh
+```
+
+## Installation
+
+```bash
+pi install -l git:github.com/fegome90-cmd/subagent-statusline@v0.1.0
+# Or for development:
+pi -e ./extensions/index.ts
+```
 
 ## Testing
 
 ```bash
-node --test test/*.ts
+node --test extensions/test/*.ts
 ```
 
 ## Design Principles
@@ -25,3 +38,4 @@ node --test test/*.ts
 - Flicker-free: `setWidget()` only on structural changes, never on timers
 - Spinner animation via cheap `setStatus()` in footer
 - Stable hash prevents redundant re-renders
+- Pi package: installed via `pi install`, not manual copy

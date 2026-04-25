@@ -27,20 +27,30 @@ Monitors sub-agents spawned via tmux-live or pi's built-in subagent tool and sho
 
 ## Installation
 
-Copy into your pi extensions directory:
+### From GitHub (recommended)
 
 ```bash
-cp -r subagent-statusline/ ~/.pi/extensions/
+# Global install
+pi install git:github.com/fegome90-cmd/subagent-statusline@v0.1.0
+
+# Project-local install (recommended for teams)
+pi install -l git:github.com/fegome90-cmd/subagent-statusline@v0.1.0
 ```
 
-Or add to your project's `package.json`:
+### From local path (development)
 
-```json
-{
-  "pi": {
-    "extensions": ["./node_modules/subagent-statusline/index.ts"]
-  }
-}
+```bash
+# Quick test without installing
+pi -e ./extensions/index.ts
+
+# Install from local repo
+pi install -l ./
+```
+
+### Verify installation
+
+```bash
+pi list
 ```
 
 ## Quick Start
@@ -101,15 +111,16 @@ When no agents are active, the footer shows: `agents: idle`
 ## Architecture
 
 ```
-index.ts  ──►  Event handlers, lifecycle, /agents command
-   │
-   ├──► state.ts   ──►  Types (ChildAgent, SubagentState, TokenUsage)
-   │                      Pure functions (addChild, markChildDone, formatElapsed)
-   │
-   └──► render.ts  ──►  Three render modes:
-                          renderStatusLine()  — compact widget
-                          renderFullTable()   — overlay table
-                          renderFooterStatus() — minimal footer
+extensions/
+  index.ts   ──►  Event handlers, lifecycle, /agents command
+     │
+     ├──► state.ts   ──►  Types (ChildAgent, SubagentState, TokenUsage)
+     │                      Pure functions (addChild, markChildDone, formatElapsed)
+     │
+     └──► render.ts  ──►  Three render modes:
+                            renderStatusLine()  — compact widget
+                            renderFullTable()   — overlay table
+                            renderFooterStatus() — minimal footer
 ```
 
 ### Flicker-Free Design
@@ -160,8 +171,8 @@ LAST:      stale timeout (3 min, for orphans)
 <!-- AUTO-GENERATED:start:scripts -->
 | Command | Description |
 |---------|-------------|
-| `npm test` | Run test suite via `node --test test/*.ts` |
-| `./scripts/smoke-flicker.sh` | Analyze debug log for anti-flicker verification (requires `SUBAGENT_STATUSLINE_DEBUG=1`) |
+| `npm test` | Run test suite via `node --test extensions/test/*.ts` |
+| `./extensions/scripts/smoke-flicker.sh` | Analyze debug log for anti-flicker verification (requires `SUBAGENT_STATUSLINE_DEBUG=1`) |
 <!-- AUTO-GENERATED:end:scripts -->
 
 ## Testing
@@ -173,20 +184,20 @@ npm test
 # Anti-flicker smoke test (requires debug log)
 export SUBAGENT_STATUSLINE_DEBUG=1
 # ... run an orchestration in pi ...
-./scripts/smoke-flicker.sh
+./extensions/scripts/smoke-flicker.sh
 ```
 
 Test files:
 
 | File | What it tests |
 |------|---------------|
-| `test/run.ts` | Core runner |
-| `test/verification-tests.ts` | Rendering correctness |
-| `test/edge-cases.ts` | Boundary conditions |
-| `test/token-edge-cases.ts` | Token formatting edge cases |
-| `test/flicker-test.ts` | Anti-flicker behavior |
-| `test/flicker-negative-test.ts` | Flicker absence verification |
-| `test/flicker-behavioral-test.ts` | Behavioral flicker patterns |
+| `extensions/test/run.ts` | Core runner |
+| `extensions/test/verification-tests.ts` | Rendering correctness |
+| `extensions/test/edge-cases.ts` | Boundary conditions |
+| `extensions/test/token-edge-cases.ts` | Token formatting edge cases |
+| `extensions/test/flicker-test.ts` | Anti-flicker behavior |
+| `extensions/test/flicker-negative-test.ts` | Flicker absence verification |
+| `extensions/test/flicker-behavioral-test.ts` | Behavioral flicker patterns |
 
 ## Contributing
 

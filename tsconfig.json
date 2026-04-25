@@ -13,6 +13,6 @@
 		"outDir": "./dist",
 		"rootDir": "."
 	},
-	"include": ["index.ts", "render.ts", "state.ts"],
-	"exclude": ["node_modules", "dist", "test"]
+	"include": ["extensions/index.ts", "extensions/render.ts", "extensions/state.ts"],
+	"exclude": ["node_modules", "dist", "extensions/test"]
 }

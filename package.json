@@ -1,16 +1,22 @@
 {
-	"name": "subagent-statusline",
+	"name": "pi-subagent-statusline",
 	"version": "0.1.0",
 	"description": "Pi extension that monitors sub-agent status with semantic theming, flicker-free rendering, and progressive disclosure",
 	"type": "module",
-	"main": "index.ts",
+	"main": "extensions/index.ts",
+	"keywords": ["pi-package"],
 	"pi": {
-		"extensions": [
-			"./index.ts"
-		]
+		"extensions": ["./extensions/index.ts"]
+	},
+	"peerDependencies": {
+		"@mariozechner/pi-coding-agent": "*",
+		"@mariozechner/pi-agent-core": "*",
+		"@mariozechner/pi-ai": "*",
+		"@mariozechner/pi-tui": "*",
+		"typebox": "*"
 	},
 	"scripts": {
-		"test": "node --test test/*.ts"
+		"test": "node --test extensions/test/*.ts"
 	},
 	"license": "MIT"
 }
