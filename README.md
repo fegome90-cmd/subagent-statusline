@@ -161,7 +161,7 @@ LAST:      stale timeout (3 min, for orphans)
 <!-- AUTO-GENERATED:start:constants -->
 | Constant | Value | Purpose |
 |----------|-------|---------|
-| `TICK_MS` | 1000 | Interval for stale checks + footer spinner |
+| `TICK_MS` | 200 | Interval for stale checks + footer spinner |
 | `STALE_MS` | 180000 (3 min) | Timeout before marking running agents as done |
 | `PRUNE_MS` | 120000 (2 min) | Time before removing done/error agents from state |
 <!-- AUTO-GENERATED:end:constants -->

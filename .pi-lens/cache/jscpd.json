@@ -1,0 +1,112 @@
+{
+  "success": true,
+  "clones": [
+    {
+      "fileA": "extensions/test/token-edge-cases.ts",
+      "startA": 12,
+      "fileB": "extensions/test/verification-tests.ts",
+      "startB": 6,
+      "lines": 30,
+      "tokens": 0
+    },
+    {
+      "fileA": "extensions/test/token-edge-cases.ts",
+      "startA": 296,
+      "fileB": "extensions/test/verification-tests.ts",
+      "startB": 173,
+      "lines": 13,
+      "tokens": 0
+    },
+    {
+      "fileA": "extensions/test/run.ts",
+      "startA": 23,
+      "fileB": "extensions/test/verification-tests.ts",
+      "startB": 9,
+      "lines": 21,
+      "tokens": 0
+    },
+    {
+      "fileA": "extensions/test/run.ts",
+      "startA": 304,
+      "fileB": "extensions/test/verification-tests.ts",
+      "startB": 173,
+      "lines": 13,
+      "tokens": 0
+    },
+    {
+      "fileA": "extensions/test/flicker-negative-test.ts",
+      "startA": 15,
+      "fileB": "extensions/test/flicker-test.ts",
+      "startB": 17,
+      "lines": 13,
+      "tokens": 0
+    },
+    {
+      "fileA": "extensions/test/flicker-negative-test.ts",
+      "startA": 28,
+      "fileB": "extensions/test/flicker-test.ts",
+      "startB": 29,
+      "lines": 12,
+      "tokens": 0
+    },
+    {
+      "fileA": "extensions/test/flicker-negative-test.ts",
+      "startA": 39,
+      "fileB": "extensions/test/flicker-test.ts",
+      "startB": 42,
+      "lines": 14,
+      "tokens": 0
+    },
+    {
+      "fileA": "extensions/test/flicker-behavioral-test.ts",
+      "startA": 52,
+      "fileB": "extensions/test/flicker-test.ts",
+      "startB": 29,
+      "lines": 12,
+      "tokens": 0
+    },
+    {
+      "fileA": "extensions/test/flicker-behavioral-test.ts",
+      "startA": 96,
+      "fileB": "extensions/test/flicker-test.ts",
+      "startB": 37,
+      "lines": 19,
+      "tokens": 0
+    },
+    {
+      "fileA": "extensions/test/edge-cases.ts",
+      "startA": 5,
+      "fileB": "extensions/test/token-edge-cases.ts",
+      "startB": 10,
+      "lines": 26,
+      "tokens": 0
+    },
+    {
+      "fileA": "extensions/test/edge-cases.ts",
+      "startA": 262,
+      "fileB": "extensions/test/token-edge-cases.ts",
+      "startB": 295,
+      "lines": 14,
+      "tokens": 0
+    },
+    {
+      "fileA": "extensions/state.ts",
+      "startA": 48,
+      "fileB": "extensions/test/flicker-test.ts",
+      "startB": 17,
+      "lines": 13,
+      "tokens": 0
+    },
+    {
+      "fileA": "extensions/hash.ts",
+      "startA": 18,
+      "fileB": "extensions/test/flicker-test.ts",
+      "startB": 32,
+      "lines": 7,
+      "tokens": 0
+    }
+  ],
+  "duplicatedLines": 194,
+  "totalLines": 2759,
+  "percentage": 7.03
+}

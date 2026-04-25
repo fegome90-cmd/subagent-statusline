@@ -74,7 +74,7 @@ function debugLog(input: Record<string, unknown>): void {
 
 // ── Constants ─────────────────────────────────────────────
 
-const TICK_MS = 1000; // Tick interval for stale checks + footer spinner
+const TICK_MS = 200; // Tick interval for stale checks + footer spinner
 const STALE_MS = 3 * 60 * 1000; // Stale timeout: 3 min for orphaned agents
 const PRUNE_MS = 2 * 60 * 1000; // Prune done/error agents after 2 min
 

@@ -1,0 +1,17 @@
+{
+  "nextId": 2,
+  "tasks": [
+    {
+      "id": "1",
+      "subject": "Explore data pipeline for subagent-statusline pi extension",
+      "description": "Investigate tmux-live script, pi event types, message_end data, and bash tool results to determine what data is available for monitoring sub-agents.",
+      "status": "completed",
+      "activeForm": "Exploring data pipeline",
+      "metadata": {},
+      "blocks": [],
+      "blockedBy": [],
+      "createdAt": 1777134187687,
+      "updatedAt": 1777134321839
+    }
+  ]
+}
