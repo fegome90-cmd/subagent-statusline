@@ -1,10 +1,20 @@
 # subagent-statusline
 
+[![version](https://img.shields.io/badge/version-0.1.0-blue.svg)](https://github.com/fegome90-cmd/subagent-statusline)
+[![license](https://img.shields.io/badge/license-MIT-green.svg)](https://github.com/fegome90-cmd/subagent-statusline/blob/main/LICENSE)
+[![type](https://img.shields.io/badge/type-pi%20extension-purple.svg)](https://github.com/mariozechner/pi-coding-agent)
+
 > Pi extension for monitoring sub-agent status with semantic theming and flicker-free rendering.
 
 ## Overview
 
 Monitors sub-agents spawned via tmux-live or pi's built-in subagent tool and shows their status in the pi footer. Features three rendering modes: compact statusline widget, full table overlay (`/agents` command), and minimal footer.
+
+## Prerequisites
+
+- [pi-coding-agent](https://github.com/mariozechner/pi-coding-agent) — The extension host
+- [pi-tui](https://github.com/mariozechner/pi-tui) — TUI rendering components (`Container`, `Text`)
+- Node.js 18+ with ESM support
 
 ## Features
 
@@ -33,17 +43,46 @@ Or add to your project's `package.json`:
 }
 ```
 
-## Usage
+## Quick Start
 
-The extension activates automatically when a pi session starts.
+The extension activates automatically when a pi session starts. No configuration needed.
 
-### Commands
+**What you'll see:**
+
+When agents are running, the statusline widget appears automatically:
+
+```
+[ agents ]
+⠙ 2 running · ✓1 done
+  ↑12.5k·↓8.3k · $0.0423
+  ─────────────────────
+  ● explorer: research    02:35 │ ↑8.2k·↓5.1k claude-sonnet-4-6
+  ● implementer: auth     01:12 │ ↑4.3k·↓3.2k claude-sonnet-4-6
+  ✓ architect: design     00:45 │ ↑2.1k·↓1.8k claude-opus-4-6
+```
+
+When no agents are active, the footer shows: `agents: idle`
+
+**Full table overlay** — press `/agents` to see all agents with column-aligned details:
+
+```
+  Subagent Status
+  3 agents · 08:30:45
+
+  Stat  Name                     Elapsed   Tokens            Model
+  ────  ──────────────────────── ───────── ────────────────── ──────────
+  ●     explorer: research       02:35     ↑8.2k · ↓5.1k     sonnet-4-6
+  ●     implementer: auth        01:12     ↑4.3k · ↓3.2k     sonnet-4-6
+  ✓     architect: design        00:45     ↑2.1k · ↓1.8k     opus-4-6
+```
+
+## Commands
 
 | Command | Description |
 |---------|-------------|
 | `/agents` | Show full subagent status table overlay (press Escape to close) |
 
-### Events Tracked
+## Events Tracked
 
 <!-- AUTO-GENERATED:start:events -->
 | Event | Action |
@@ -148,6 +187,22 @@ Test files:
 | `test/flicker-test.ts` | Anti-flicker behavior |
 | `test/flicker-negative-test.ts` | Flicker absence verification |
 | `test/flicker-behavioral-test.ts` | Behavioral flicker patterns |
+
+## Contributing
+
+1. Fork the repository
+2. Create a feature branch: `git checkout -b feature/my-feature`
+3. Make your changes and add tests
+4. Ensure all tests pass: `npm test`
+5. Commit with conventional commits: `feat:`, `fix:`, `docs:`, etc.
+6. Push and open a Pull Request
+
+### Development Guidelines
+
+- **Flicker-free invariant**: Never call `setWidget()` from a timer or volatile source
+- **Pure rendering**: `render.ts` functions must be pure — no side effects, no state mutation
+- **State isolation**: `state.ts` contains only types and pure mutation helpers
+- **Theme API**: All visual output goes through `ctx.ui.theme` — no hardcoded ANSI codes
 
 ## License
 
