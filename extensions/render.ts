@@ -163,6 +163,7 @@ export function renderStatusLine(
 	state: SubagentState,
 	theme: ThemeAPI,
 	nowMs?: number,
+	width: number = 80,
 ): string[] {
 	const counts = getCounts(state);
 	const total = counts.running + counts.done + counts.error;
@@ -236,7 +237,7 @@ export function renderStatusLine(
 		lines.push(theme.fg("dim", `  +${children.length - 6} more`));
 	}
 
-	return lines;
+	return lines.map((l) => truncateAnsi(l, width));
 }
 
 // ── Overlay render: P1-1 progressive-disclosure full table ──
@@ -314,7 +315,8 @@ export function renderFooterStatus(
 
 	const parts: string[] = [];
 	if (counts.running > 0) {
-		parts.push(theme.fg("accent", `${counts.running} running`));
+		const icon = theme.fg("accent", SPINNER_FRAMES[spinnerIdx]);
+		parts.push(`${icon} ${counts.running} running`);
 	}
 	if (counts.done > 0) {
 		parts.push(theme.fg("success", `${counts.done} done`));

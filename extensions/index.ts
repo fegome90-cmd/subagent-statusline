@@ -462,6 +462,7 @@ export default function (pi: ExtensionAPI) {
 		}
 
 		debugLog({ kind: "session.switch" });
+		ctx.ui.setStatus(statusId, ctx.ui.theme.fg("dim", "agents: idle"));
 		pushWidgetIfChanged(ctx, "session.switch");
 	});
 
