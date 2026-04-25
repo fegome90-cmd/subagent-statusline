@@ -27,5 +27,8 @@ coverage/
 .temp/
 tmp/
 
+# Claude Code local data
+.claude/
+
 # Debug
 subagent-statusline-debug/
