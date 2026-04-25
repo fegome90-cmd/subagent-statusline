@@ -66,9 +66,9 @@ When agents are running, the statusline widget appears automatically:
 ⠙ 2 running · ✓1 done
   ↑12.5k·↓8.3k · $0.0423
   ─────────────────────
-  ● explorer: research  │ ↑8.2k·↓5.1k claude-sonnet-4-6
-  ● implementer: auth   │ ↑4.3k·↓3.2k claude-sonnet-4-6
-  ✓ architect: design   │ ↑2.1k·↓1.8k claude-opus-4-6
+  ● explorer: research  02:35 │ ↑8.2k·↓5.1k claude-sonnet-4-6
+  ● implementer: auth   01:12 │ ↑4.3k·↓3.2k claude-sonnet-4-6
+  ✓ architect: design   00:45 │ ↑2.1k·↓1.8k claude-opus-4-6
 ```
 
 When no agents are active, the footer shows: `agents: idle`

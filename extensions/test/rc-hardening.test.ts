@@ -135,22 +135,22 @@ describe("width bounds", () => {
 });
 
 // ═══════════════════════════════════════════════
-// 4. No elapsed in compact widget
+// 4. Elapsed in compact widget
 // ═══════════════════════════════════════════════
 
-describe("compact widget has no elapsed", () => {
-	it("renderStatusLine detail rows do not contain elapsed timestamps", () => {
+describe("compact widget has elapsed", () => {
+	it("renderStatusLine detail rows contain elapsed timestamps", () => {
 		const state = createState();
 		addChild(state, "test:1", "agent-1", "explorer");
 		const lines = renderStatusLine(state, stubTheme, 100000);
-		// Elapsed format is MM:SS or H:MM:SS — check no digit:digits pattern
+		// Elapsed format is MM:SS or H:MM:SS — check elapsed format
 		const detailLines = lines.slice(4); // Skip header, aggregate, separator
 		for (const line of detailLines) {
 			// Match elapsed patterns like "02:35" or "1:02:35"
 			const hasElapsed = /\d{1,2}:\d{2}(?::\d{2})?/.test(
 				line.replace(/\x1b\[[0-9;]*m/g, ""),
 			);
-			assert.ok(!hasElapsed, `Detail row has elapsed: ${line}`);
+			assert.ok(hasElapsed, "Detail row should have elapsed timestamp");
 		}
 	});
 

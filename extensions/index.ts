@@ -339,15 +339,14 @@ export default function (pi: ExtensionAPI) {
 	// ── Tick management ─────────────────────────────────────
 	// Tick does TWO things only:
 	//   1. Stale cleanup (state mutation → triggers pushWidgetIfChanged)
-	//   2. Footer spinner update (cheap setStatus — NOT setWidget)
-
 	function ensureTick() {
 		if (tickInterval) return;
 		startTick();
 	}
 
 	function checkTickNeeded() {
-		const counts = getCounts(state);
+			const counts = getCounts(state);
+
 		if (counts.running === 0 && tickInterval) {
 			clearInterval(tickInterval);
 			tickInterval = null;
@@ -372,8 +371,18 @@ export default function (pi: ExtensionAPI) {
 			const tickCtx = capturedCtx;
 			if (!tickCtx || state.children.size === 0) return;
 
-			// Advance spinner (volatile — only affects footer)
+			// Advance spinner — re-render widget + footer for animation
 			advanceSpinner();
+
+			// Re-push widget for spinner animation when agents are running
+			const counts = getCounts(state);
+			if (counts.running > 0) {
+				const widgetLines = renderStatusLine(state, tickCtx.ui.theme);
+				if (widgetLines.length > 0) {
+					tickCtx.ui.setWidget(widgetId, widgetLines);
+				}
+				pushFooter(tickCtx);
+			}
 
 			// Stale timeout: state mutation — will trigger pushWidgetIfChanged
 			const staleCutoff = Date.now() - STALE_MS;
@@ -390,10 +399,7 @@ export default function (pi: ExtensionAPI) {
 				pushWidgetIfChanged(tickCtx, "tick.stale");
 			}
 
-			// Footer spinner update — cheap, every tick, NO setWidget
-			pushFooter(tickCtx);
 
-			const counts = getCounts(state);
 			if (counts.running === 0) {
 				clearInterval(tickInterval!);
 				tickInterval = null;

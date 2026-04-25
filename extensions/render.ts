@@ -224,9 +224,10 @@ export function renderStatusLine(
 		const child = children[i];
 		const icon = statusIcon(child.status, theme);
 		const name = childDisplayName(child);
+			const elapsed = formatElapsed(child, ms);
 		const meta = buildMetaLine(child, theme);
 
-		let row = `  ${icon} ${theme.fg("text", name)}`;
+			let row = `  ${icon} ${theme.fg("text", name)}  ${theme.fg("muted", elapsed)}`;
 		if (meta) {
 			row += ` ${theme.fg("dim", "│")} ${meta}`;
 		}
