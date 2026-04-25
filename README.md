@@ -204,6 +204,10 @@ Test files:
 - **State isolation**: `state.ts` contains only types and pure mutation helpers
 - **Theme API**: All visual output goes through `ctx.ui.theme` — no hardcoded ANSI codes
 
+## Acknowledgments
+
+Built for [pi](https://github.com/badlogic/pi-mono) by Mario Zechner — a minimal terminal coding harness.
+
 ## License
 
 MIT
