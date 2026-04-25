@@ -4,19 +4,26 @@
 	"description": "Pi extension that monitors sub-agent status with semantic theming, flicker-free rendering, and progressive disclosure",
 	"type": "module",
 	"main": "extensions/index.ts",
-	"keywords": ["pi-package"],
+	"keywords": [
+		"pi-package"
+	],
 	"pi": {
-		"extensions": ["./extensions/index.ts"]
+		"extensions": [
+			"./extensions/index.ts"
+		]
 	},
 	"peerDependencies": {
-		"@mariozechner/pi-coding-agent": "*",
 		"@mariozechner/pi-agent-core": "*",
 		"@mariozechner/pi-ai": "*",
+		"@mariozechner/pi-coding-agent": "*",
 		"@mariozechner/pi-tui": "*",
 		"typebox": "*"
 	},
 	"scripts": {
-		"test": "node --test extensions/test/*.ts"
+		"test": "node --import tsx --test extensions/test/*.ts"
 	},
-	"license": "MIT"
+	"license": "MIT",
+	"devDependencies": {
+		"tsx": "^4.21.0"
+	}
 }

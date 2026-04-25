@@ -41,6 +41,7 @@ import {
 	type SubagentState,
 	type TokenUsage,
 } from "./state.js";
+import { computeStableHash } from "./hash.js";
 
 // ── Debug logging ─────────────────────────────────────────
 const DEBUG = !!process.env.SUBAGENT_STATUSLINE_DEBUG;
@@ -112,41 +113,28 @@ export default function (pi: ExtensionAPI) {
 	// (tool_execution_end provides event.result, not event.args)
 	const bashCommandByCallId = new Map<string, string>();
 
-	// ── Stable model hash ───────────────────────────────
-	// ONLY contains fields that represent structural changes to the agent list.
-	// NEVER contains volatile fields: timeBucket, elapsed, spinnerIdx, Date.now().
-	// When this hash changes, setWidget() is called. When it doesn't, it isn't.
+		// ── Stable model hash (see hash.ts) ──────────────────────
+	// Stateless, testable function extracted to hash.ts.
 
-	function computeStableHash(): string {
-		const counts = getCounts(state);
-		const parts: string[] = [
-			`${counts.running}:${counts.done}:${counts.error}`,
-		];
-
-		// Per-agent fingerprint: status + model presence + usage presence
-		// (NOT model value changes — only arrival matters for structural change)
-		for (const child of state.children.values()) {
-			parts.push(
-				`${child.id}:${child.status}:${child.model ? "m" : ""}:${child.usage ? "u" : ""}`,
-			);
-		}
-		return parts.join("|");
-	}
-
-	// ── Widget push (stable-change only) ─────────────────
+// ── Widget push (stable-change only) ─────────────────
 	// This is the ONLY function that calls setWidget().
 	// It compares stable hash and skips if unchanged.
 
 	function pushWidgetIfChanged(ctx: ExtensionContext, reason: string): void {
-		const hash = computeStableHash();
+		const hash = computeStableHash(state);
 		if (hash === lastStableHash) return;
 
 		const prevHash = lastStableHash;
 		lastStableHash = hash;
 		setWidgetCallCount++;
 
-		const footer = renderFooterStatus(state, ctx.ui.theme);
-		ctx.ui.setStatus(statusId, footer || "");
+		// Only update footer when agents exist — don't overwrite idle footer
+		const counts = getCounts(state);
+		const total = counts.running + counts.done + counts.error;
+		if (total > 0) {
+			const footer = renderFooterStatus(state, ctx.ui.theme);
+			ctx.ui.setStatus(statusId, footer || "");
+		}
 
 		const lines = renderStatusLine(state, ctx.ui.theme);
 		if (lines.length > 0) {

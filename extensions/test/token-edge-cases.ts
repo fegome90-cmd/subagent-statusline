@@ -2,15 +2,15 @@ import {
 	renderFooterStatus,
 	renderStatusLine,
 	shortenModel,
-} from "../render.js";
-import type { TokenUsage } from "../state.js";
+} from "../render.ts";
+import type { TokenUsage } from "../state.ts";
 import {
 	addChild,
 	createState,
 	formatTokens,
 	markChildDone,
 	markChildError,
-} from "../state.js";
+} from "../state.ts";
 
 let passed = 0;
 let failed = 0;

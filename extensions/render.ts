@@ -56,7 +56,6 @@ function statusIcon(status: ChildAgent["status"], theme: ThemeAPI): string {
 }
 
 // ── Column alignment constants (P0-3 typeui-clean) ──
-const ELAPSED_COL = 28;
 
 // ── Model shortening ──
 
@@ -224,19 +223,10 @@ export function renderStatusLine(
 		const child = children[i];
 		const icon = statusIcon(child.status, theme);
 		const name = childDisplayName(child);
-		const elapsed = formatElapsed(child, ms);
 		const meta = buildMetaLine(child, theme);
 
-		// P0-3 typeui-clean: fixed column alignment
-		const namePart = padRight(
-			`${icon} ${theme.fg("text", name)}`,
-			ELAPSED_COL - 2,
-		);
-		const elapsedPart = padRight(theme.fg("muted", elapsed), 9);
-
-		let row = `  ${namePart} ${elapsedPart}`;
+		let row = `  ${icon} ${theme.fg("text", name)}`;
 		if (meta) {
-			// P1-2 shadcn: │ pipe between columns
 			row += ` ${theme.fg("dim", "│")} ${meta}`;
 		}
 		lines.push(row);
@@ -277,18 +267,16 @@ export function renderFullTable(
 	const NAME_W = 24;
 	const ELAPSED_W = 9;
 	const TOKEN_W = 18;
-	lines.push(
-		theme.fg(
+	const headerLine = theme.fg(
 			"dim",
 			`  ${padRight("Stat", 4)}  ${padRight("Name", NAME_W)} ${padRight("Elapsed", ELAPSED_W)} ${padRight("Tokens", TOKEN_W)} Model`,
-		),
-	);
-	lines.push(
-		theme.fg(
+		);
+		lines.push(truncateAnsi(headerLine, width));
+		const sepLine = theme.fg(
 			"dim",
 			`  ${padRight("────", 4)}  ${padRight("─".repeat(NAME_W), NAME_W)} ${padRight("─".repeat(ELAPSED_W), ELAPSED_W)} ${padRight("─".repeat(TOKEN_W), TOKEN_W)} ${"─".repeat(10)}`,
-		),
-	);
+		);
+		lines.push(truncateAnsi(sepLine, width));
 
 	for (const child of children) {
 		const icon = statusIcon(child.status, theme);

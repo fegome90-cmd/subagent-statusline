@@ -7,7 +7,7 @@ import {
 	renderFooterStatus,
 	renderStatusLine,
 	type ThemeAPI,
-} from "../render.js";
+} from "../render.ts";
 import {
 	addChild,
 	childDisplayName,
@@ -16,7 +16,7 @@ import {
 	getCounts,
 	markChildDone,
 	markChildError,
-} from "../state.js";
+} from "../state.ts";
 
 // ── Test harness ───────────────────────────────────────────
 

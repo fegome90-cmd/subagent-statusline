@@ -1,10 +1,10 @@
-import { renderFullTable, renderStatusLine, shortenModel } from "../render.js";
+import { renderFullTable, renderStatusLine, shortenModel } from "../render.ts";
 import {
 	addChild,
 	createState,
 	formatTokens,
 	markChildDone,
-} from "../state.js";
+} from "../state.ts";
 
 let passed = 0;
 let failed = 0;

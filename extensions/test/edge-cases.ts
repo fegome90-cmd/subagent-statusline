@@ -5,7 +5,7 @@ import {
 	getCounts,
 	markChildDone,
 	markChildError,
-} from "../state.js";
+} from "../state.ts";
 
 let passed = 0;
 let failed = 0;
