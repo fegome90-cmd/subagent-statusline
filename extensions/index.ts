@@ -24,6 +24,7 @@ import type {
 	ExtensionContext,
 } from "@mariozechner/pi-coding-agent";
 import { Container, Text } from "@mariozechner/pi-tui";
+import { computeStableHash } from "./hash.js";
 import {
 	advanceSpinner,
 	renderFooterStatus,
@@ -41,24 +42,31 @@ import {
 	type SubagentState,
 	type TokenUsage,
 } from "./state.js";
-import { computeStableHash } from "./hash.js";
 
 // ── Debug logging ─────────────────────────────────────────
 const DEBUG = !!process.env.SUBAGENT_STATUSLINE_DEBUG;
 
+const debugStream = DEBUG
+	? (() => {
+			const dir = path.join(
+				process.env.XDG_RUNTIME_DIR ?? "/tmp",
+				"subagent-statusline",
+			);
+			fs.mkdirSync(dir, { recursive: true });
+			return fs.createWriteStream(path.join(dir, "debug.log"), {
+				flags: "a",
+			});
+		})()
+	: null;
+
 function debugLog(input: Record<string, unknown>): void {
-	if (!DEBUG) return;
+	if (!DEBUG || !debugStream) return;
 	try {
-		const dir = path.join(
-			process.env.XDG_RUNTIME_DIR ?? "/tmp",
-			"subagent-statusline",
-		);
-		fs.mkdirSync(dir, { recursive: true });
 		const line = JSON.stringify({
 			time: new Date().toISOString(),
 			...input,
 		});
-		fs.appendFileSync(path.join(dir, "debug.log"), `${line}\n`, "utf8");
+		debugStream.write(`${line}\n`);
 	} catch {
 		// Debug logging must never crash the extension.
 	}
@@ -113,10 +121,10 @@ export default function (pi: ExtensionAPI) {
 	// (tool_execution_end provides event.result, not event.args)
 	const bashCommandByCallId = new Map<string, string>();
 
-		// ── Stable model hash (see hash.ts) ──────────────────────
+	// ── Stable model hash (see hash.ts) ──────────────────────
 	// Stateless, testable function extracted to hash.ts.
 
-// ── Widget push (stable-change only) ─────────────────
+	// ── Widget push (stable-change only) ─────────────────
 	// This is the ONLY function that calls setWidget().
 	// It compares stable hash and skips if unchanged.
 
@@ -471,6 +479,11 @@ export default function (pi: ExtensionAPI) {
 			clearInterval(tickInterval);
 			tickInterval = null;
 		}
+		state.children.clear();
+		pendingSubagentCalls.clear();
+		bashCommandByCallId.clear();
+		lastStableHash = "";
+		setWidgetCallCount = 0;
 		debugLog({ kind: "session.shutdown" });
 	});
 
@@ -491,70 +504,78 @@ export default function (pi: ExtensionAPI) {
 	// ── Tool execution tracking (PRIMARY authority) ──────────
 
 	pi.on("tool_execution_start", async (event, ctx: ExtensionContext) => {
-		capturedCtx = ctx;
+		try {
+			capturedCtx = ctx;
 
-		if (event.toolName === "subagent") {
-			handleSubagentStart(
-				event.args as Record<string, unknown>,
-				event.toolCallId as string | undefined,
-			);
-			ensureTick();
-			pushWidgetIfChanged(ctx, "tool_execution_start.subagent");
-			return;
-		}
+			if (event.toolName === "subagent") {
+				if (!event.args || typeof event.args !== "object") return;
+				handleSubagentStart(
+					event.args as Record<string, unknown>,
+					event.toolCallId as string | undefined,
+				);
+				ensureTick();
+				pushWidgetIfChanged(ctx, "tool_execution_start.subagent");
+				return;
+			}
 
-		if (event.toolName !== "bash") return;
+			if (event.toolName !== "bash") return;
 
-		const cmd = (event.args as Record<string, unknown> | undefined)?.command as
-			| string
-			| undefined;
+			const cmd = (event.args as Record<string, unknown> | undefined)
+				?.command as string | undefined;
 
-		if (!cmd) return;
-		if (cmd.length > 1000) return;
+			if (!cmd) return;
+			if (cmd.length > 1000) return;
 
-		if (LAUNCH_RE.test(cmd)) {
-			handleLaunch(cmd);
-			pushWidgetIfChanged(ctx, "tool_execution_start.launch");
-		}
+			if (LAUNCH_RE.test(cmd)) {
+				handleLaunch(cmd);
+				pushWidgetIfChanged(ctx, "tool_execution_start.launch");
+			}
 
-		if (event.toolCallId && cmd) {
-			bashCommandByCallId.set(event.toolCallId, cmd);
+			if (event.toolCallId && cmd) {
+				bashCommandByCallId.set(event.toolCallId, cmd);
+			}
+		} catch (err) {
+			debugLog({ kind: "error.tool_execution_start", msg: String(err) });
 		}
 	});
 
 	pi.on("tool_execution_end", async (event, ctx: ExtensionContext) => {
-		capturedCtx = ctx;
+		try {
+			capturedCtx = ctx;
 
-		if (event.toolName === "subagent") {
-			handleSubagentEnd(
-				event.isError === true,
-				event.toolCallId as string | undefined,
-				event.result as unknown | undefined,
-			);
-			pushWidgetIfChanged(ctx, "tool_execution_end.subagent");
-			return;
-		}
+			if (event.toolName === "subagent") {
+				handleSubagentEnd(
+					event.isError === true,
+					event.toolCallId as string | undefined,
+					event.result as unknown | undefined,
+				);
+				pushWidgetIfChanged(ctx, "tool_execution_end.subagent");
+				return;
+			}
 
-		if (event.toolName !== "bash") return;
+			if (event.toolName !== "bash") return;
 
-		const cmd = event.toolCallId
-			? bashCommandByCallId.get(event.toolCallId)
-			: undefined;
+			const cmd = event.toolCallId
+				? bashCommandByCallId.get(event.toolCallId)
+				: undefined;
 
-		if (!cmd) return;
-		if (cmd.length > 1000) return;
+			if (!cmd) return;
+			if (cmd.length > 1000) return;
 
-		if (event.toolCallId) bashCommandByCallId.delete(event.toolCallId);
+			if (event.toolCallId) bashCommandByCallId.delete(event.toolCallId);
 
-		if (RESPONSE_RE.test(cmd) || STATUS_RE.test(cmd)) {
-			handleResponse(cmd, event.isError === true);
-			pushWidgetIfChanged(ctx, "tool_execution_end.response");
-		} else if (KILLALL_RE.test(cmd) && !event.isError) {
-			handleKillAll();
-			pushWidgetIfChanged(ctx, "tool_execution_end.kill-all");
-		} else if (FALLBACK_OUTPUT_READ && OUTPUT_FILE_RE.test(cmd)) {
-			handleOutputRead();
-			pushWidgetIfChanged(ctx, "tool_execution_end.fallback");
+			if (RESPONSE_RE.test(cmd) || STATUS_RE.test(cmd)) {
+				handleResponse(cmd, event.isError === true);
+				pushWidgetIfChanged(ctx, "tool_execution_end.response");
+			} else if (KILLALL_RE.test(cmd) && !event.isError) {
+				handleKillAll();
+				pushWidgetIfChanged(ctx, "tool_execution_end.kill-all");
+			} else if (FALLBACK_OUTPUT_READ && OUTPUT_FILE_RE.test(cmd)) {
+				handleOutputRead();
+				pushWidgetIfChanged(ctx, "tool_execution_end.fallback");
+			}
+		} catch (err) {
+			debugLog({ kind: "error.tool_execution_end", msg: String(err) });
 		}
 	});
 
@@ -599,5 +620,8 @@ export default function (pi: ExtensionAPI) {
 		if (state.children.size === 0 && lastStableHash !== "") {
 			clearWidget(ctx);
 		}
+
+		// Age out bash command entries at turn boundary
+		bashCommandByCallId.clear();
 	});
 }
