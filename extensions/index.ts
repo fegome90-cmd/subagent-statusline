@@ -4,12 +4,12 @@
  * Monitors tmux_fork sub-agents and shows their status in the pi footer.
  *
  * FLICKER-FREE DESIGN:
- *   - setWidget() is ONLY called when the stable model changes:
- *     agent added/removed, status transition, model/usage arrival.
- *   - setWidget() is NEVER called by timers, ticks, or elapsed updates.
- *   - Spinner animation lives in the footer via setStatus(), which is cheap.
- *   - The tick interval only handles: stale cleanup + footer spinner update.
- *   - Hash contains ZERO volatile fields (no timeBucket, no elapsed, no spinnerIdx).
+ *   - pushWidgetIfChanged() skips setWidget when stable hash is unchanged.
+ *   - Stable hash includes: agent count, status, model/usage presence.
+ *   - Hash contains ZERO volatile fields (no elapsed, no spinnerIdx).
+ *   - The tick re-renders the widget for spinner + elapsed animation,
+ *     but only when agents are running (and only the widget, not structural state).
+ *   - Stale checks run at reduced rate (~5s) to minimize I/O.
  *
  * Authority chain:
  *   PRIMARY:  tool_execution_start/end events (launch, response, kill-all)
@@ -410,23 +410,21 @@ export default function (pi: ExtensionAPI) {
 			? `agent-${providerMatch[1]}`
 			: undefined;
 
-		let changed = false;
+		// Match only the FIRST running pidirect agent with matching name
 		for (const [id, child] of state.children) {
 			if (child.status === "running" && id.startsWith("pidirect:")) {
-				if (
+				const nameMatch =
 					(rawName && id.includes(rawName)) ||
 					(!rawName && fallbackName && id.includes(fallbackName)) ||
-					(!rawName && !fallbackName)
-				) {
-					changed = isError
-						? markChildError(state, id)
-						: markChildDone(state, id) || changed;
+					(!rawName && !fallbackName);
+				if (nameMatch) {
+					if (isError) markChildError(state, id);
+					else markChildDone(state, id);
+					debugLog({ kind: "pi-direct-end", id, rawName, isError });
+					checkTickNeeded();
+					return; // Only close the first match
 				}
 			}
-		}
-		if (changed) {
-			debugLog({ kind: "pi-direct-end", rawName, isError });
-			checkTickNeeded();
 		}
 	}
 
@@ -625,7 +623,7 @@ export default function (pi: ExtensionAPI) {
 		pushWidgetIfChanged(ctx, "session.start");
 	});
 
-	/*
+	// eslint-disable-next-line @typescript-eslint/no-explicit-any
 	pi.on("session_switch", async (_event: any, ctx: ExtensionContext) => {
 		capturedCtx = ctx;
 		state.children.clear();
@@ -645,7 +643,6 @@ export default function (pi: ExtensionAPI) {
 		ctx.ui.setStatus(statusId, ctx.ui.theme.fg("dim", "agents: idle"));
 		pushWidgetIfChanged(ctx, "session.switch");
 	});
-*/
 
 	pi.on("session_shutdown", async (_event: any, _ctx: ExtensionContext) => {
 		if (tickInterval) {

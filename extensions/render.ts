@@ -193,8 +193,9 @@ export function renderStatusLine(
 	}
 	lines.push(parts.join(theme.fg("dim", " · ")));
 
-	// P1-3 typeui-minimal: conditional aggregate tokens (only if >1 agent with usage)
+	// Aggregate tokens (only if >1 agent with usage)
 	const agentsWithUsage = children.filter((c) => c.usage).length;
+	const aggParts: string[] = [];
 	if (agentsWithUsage > 1) {
 		let totalInput = 0;
 		let totalOutput = 0;
@@ -206,13 +207,12 @@ export function renderStatusLine(
 				totalCost += c.usage.cost;
 			}
 		}
-		if (totalInput || totalOutput || totalCost) {
-			const aggParts: string[] = [];
-			if (totalInput) aggParts.push(`↑${formatTokens(totalInput)}`);
-			if (totalOutput) aggParts.push(`↓${formatTokens(totalOutput)}`);
-			if (totalCost) aggParts.push(`$${totalCost.toFixed(4)}`);
-			lines.push(theme.fg("dim", `  ${aggParts.join(" · ")}`));
-		}
+		if (totalInput) aggParts.push(`↑${formatTokens(totalInput)}`);
+		if (totalOutput) aggParts.push(`↓${formatTokens(totalOutput)}`);
+		if (totalCost) aggParts.push(`$${totalCost.toFixed(4)}`);
+	}
+	if (aggParts.length > 0) {
+		lines.push(theme.fg("dim", `  ${aggParts.join(" · ")}`));
 	}
 
 	// P0-1 design-principles: subtle separator before detail rows
@@ -224,10 +224,10 @@ export function renderStatusLine(
 		const child = children[i];
 		const icon = statusIcon(child.status, theme);
 		const name = childDisplayName(child);
-			const elapsed = formatElapsed(child, ms);
+		const elapsed = formatElapsed(child, ms);
 		const meta = buildMetaLine(child, theme);
 
-			let row = `  ${icon} ${theme.fg("text", name)}  ${theme.fg("muted", elapsed)}`;
+		let row = `  ${icon} ${theme.fg("text", name)}  ${theme.fg("muted", elapsed)}`;
 		if (meta) {
 			row += ` ${theme.fg("dim", "│")} ${meta}`;
 		}
@@ -270,15 +270,15 @@ export function renderFullTable(
 	const ELAPSED_W = 9;
 	const TOKEN_W = 18;
 	const headerLine = theme.fg(
-			"dim",
-			`  ${padRight("Stat", 4)}  ${padRight("Name", NAME_W)} ${padRight("Elapsed", ELAPSED_W)} ${padRight("Tokens", TOKEN_W)} Model`,
-		);
-		lines.push(truncateAnsi(headerLine, width));
-		const sepLine = theme.fg(
-			"dim",
-			`  ${padRight("────", 4)}  ${padRight("─".repeat(NAME_W), NAME_W)} ${padRight("─".repeat(ELAPSED_W), ELAPSED_W)} ${padRight("─".repeat(TOKEN_W), TOKEN_W)} ${"─".repeat(10)}`,
-		);
-		lines.push(truncateAnsi(sepLine, width));
+		"dim",
+		`  ${padRight("Stat", 4)}  ${padRight("Name", NAME_W)} ${padRight("Elapsed", ELAPSED_W)} ${padRight("Tokens", TOKEN_W)} Model`,
+	);
+	lines.push(truncateAnsi(headerLine, width));
+	const sepLine = theme.fg(
+		"dim",
+		`  ${padRight("────", 4)}  ${padRight("─".repeat(NAME_W), NAME_W)} ${padRight("─".repeat(ELAPSED_W), ELAPSED_W)} ${padRight("─".repeat(TOKEN_W), TOKEN_W)} ${"─".repeat(10)}`,
+	);
+	lines.push(truncateAnsi(sepLine, width));
 
 	for (const child of children) {
 		const icon = statusIcon(child.status, theme);
