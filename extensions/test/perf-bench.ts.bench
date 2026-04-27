@@ -1,0 +1,128 @@
+/**
+ * Performance micro-benchmark for subagent-statusline hot paths.
+ * Measures: rendering, hash computation, usage parsing.
+ *
+ * Run: node --import tsx extensions/test/perf-bench.ts
+ */
+
+import { computeStableHash } from "../hash.js";
+import {
+	renderFooterStatus,
+	renderFullTable,
+	renderStatusLine,
+	shortenModel,
+} from "../render.js";
+import {
+	addChild,
+	createState,
+	formatElapsed,
+	formatTokens,
+	getCounts,
+	markChildDone,
+	type SubagentState,
+} from "../state.js";
+
+// ── Mock theme ──
+const mockTheme = {
+	fg: (_name: string, text: string) => text,
+	bg: (_name: string, text: string) => text,
+	bold: (text: string) => text,
+};
+
+// ── Helpers ──
+function bench(name: string, fn: () => void, iterations: number = 10000) {
+	// Warmup
+	for (let i = 0; i < 100; i++) fn();
+
+	const start = performance.now();
+	for (let i = 0; i < iterations; i++) fn();
+	const elapsed = performance.now() - start;
+
+	const perOp = elapsed / iterations;
+	console.log(
+		`  ${name}: ${elapsed.toFixed(2)}ms total, ${perOp.toFixed(4)}ms/op (${iterations} ops)`,
+	);
+	return { name, elapsed, perOp, iterations };
+}
+
+// ── Setup: create state with 5 agents (typical orchestration) ──
+function createTypicalState(): SubagentState {
+	const state = createState();
+	addChild(state, "tmux:exp-1", "EXP-1", "explorer");
+	addChild(state, "tmux:arch-1", "ARCH-1", "architect");
+	addChild(state, "tmux:impl-1", "IMPL-1", "implementer");
+	addChild(state, "tmux:ver-1", "VER-1", "verifier");
+	addChild(state, "tmux:ana-1", "ANA-1", "analyst");
+	return state;
+}
+
+function createMixedState(): SubagentState {
+	const state = createTypicalState();
+	markChildDone(state, "tmux:exp-1");
+	markChildDone(state, "tmux:ver-1");
+	return state;
+}
+
+// ── Benchmarks ──
+console.log("=== Subagent-Statusline Performance Benchmark ===\n");
+
+console.log("1. Hash computation (stable change detection)");
+const state1 = createMixedState();
+bench("computeStableHash (5 agents, 2 done)", () => computeStableHash(state1));
+
+console.log("\n2. Render hot paths");
+bench("renderStatusLine (5 agents, 2 done)", () =>
+	renderStatusLine(state1, mockTheme, Date.now(), 80),
+);
+bench("renderFooterStatus (5 agents, 2 done)", () =>
+	renderFooterStatus(state1, mockTheme),
+);
+bench("renderFullTable (5 agents)", () =>
+	renderFullTable(state1, mockTheme, Date.now(), 80),
+);
+
+console.log("\n3. State operations");
+bench("getCounts (5 agents)", () => getCounts(state1));
+bench("formatElapsed", () =>
+	formatElapsed(
+		{ status: "running", startedAt: Date.now() - 180000 } as any,
+		Date.now(),
+	),
+);
+bench("formatTokens (various sizes)", () => {
+	formatTokens(42);
+	formatTokens(4200);
+	formatTokens(42000);
+	formatTokens(4200000);
+});
+
+console.log("\n4. Model shortening (with cache)");
+// Warm cache
+shortenModel("deepseek/deepseek-v4-flash");
+shortenModel("openrouter/openrouter/auto");
+bench("shortenModel (cached)", () => {
+	shortenModel("deepseek/deepseek-v4-flash");
+	shortenModel("openrouter/openrouter/auto");
+});
+
+console.log("\n5. Full widget push cycle (hash + render)");
+bench("hash + renderStatusLine + renderFooter", () => {
+	computeStableHash(state1);
+	renderStatusLine(state1, mockTheme, Date.now(), 80);
+	renderFooterStatus(state1, mockTheme);
+});
+
+console.log("\n6. Large state (20 agents)");
+const state20 = createState();
+for (let i = 0; i < 20; i++) {
+	addChild(state20, `tmux:agent-${i}`, `AGENT-${i}`, "explorer");
+}
+for (let i = 0; i < 10; i++) {
+	markChildDone(state20, `tmux:agent-${i}`);
+}
+bench("renderStatusLine (20 agents)", () =>
+	renderStatusLine(state20, mockTheme, Date.now(), 80),
+);
+bench("computeStableHash (20 agents)", () => computeStableHash(state20));
+
+console.log("\n=== Done ===");

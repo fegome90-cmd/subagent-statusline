@@ -96,6 +96,9 @@ const RESPONSE_RE = new RegExp(
 const KILLALL_RE = /tmux-live\s+kill-all/i;
 const STATUS_RE = /tmux-live\s+(?:progress|list)/i;
 
+// Detect direct pi --mode json invocations (subagent launches via bash)
+const PI_SUBAGENT_RE = /pi\s+.*--mode\s+json/i;
+
 const VALID_ROLES = [
 	"explorer",
 	"architect",
@@ -277,7 +280,6 @@ export default function (pi: ExtensionAPI) {
 	function readModelFromMeta(name: string): string | undefined {
 		const metaPath = path.join(FORK_LIVE_REGISTRY, `fork-${name}.meta`);
 		try {
-			if (!fs.existsSync(metaPath)) return undefined;
 			const raw = fs.readFileSync(metaPath, "utf-8");
 			const meta = JSON.parse(raw);
 			return typeof meta.model === "string" ? meta.model : undefined;
@@ -303,11 +305,15 @@ export default function (pi: ExtensionAPI) {
 			if (jsonlFiles.length === 0) return undefined;
 
 			const jsonlPath = path.join(sessionDir, jsonlFiles[0]);
-			const lines = fs.readFileSync(jsonlPath, "utf-8").split("\n");
 
-			// Find last assistant message with usage
-			let lastUsage: TokenUsage | undefined;
-			for (const line of lines) {
+			// Read JSONL and find last assistant usage
+			// Optimization: read file and scan backwards for last usage
+			const content = fs.readFileSync(jsonlPath, "utf-8");
+			const lines = content.split("\n");
+
+			// Scan from end — last usage is most relevant
+			for (let i = lines.length - 1; i >= 0; i--) {
+				const line = lines[i];
 				if (!line.trim()) continue;
 				try {
 					const evt = JSON.parse(line);
@@ -317,7 +323,7 @@ export default function (pi: ExtensionAPI) {
 						evt.message?.usage
 					) {
 						const u = evt.message.usage;
-						lastUsage = {
+						return {
 							input: u.input ?? u.inputTokens ?? 0,
 							output: u.output ?? u.outputTokens ?? 0,
 							cacheRead: u.cacheRead ?? u.cache_read ?? 0,
@@ -331,7 +337,7 @@ export default function (pi: ExtensionAPI) {
 					// Skip malformed lines
 				}
 			}
-			return lastUsage;
+			return undefined;
 		} catch {
 			return undefined;
 		}
@@ -358,6 +364,70 @@ export default function (pi: ExtensionAPI) {
 
 		debugLog({ kind: "launch", role, name, model });
 		ensureTick();
+	}
+
+	/** Handle direct `pi --mode json` invocations as subagent launches */
+	function handlePiDirectLaunch(cmd: string) {
+		// Try to extract name from prompt file: fork-prompt-NAME.txt
+		const promptMatch = cmd.match(
+			/fork-prompt-(?:assembled-)?([a-zA-Z0-9_-]+)/,
+		);
+		const rawName = promptMatch ? promptMatch[1] : undefined;
+
+		// Extract provider/model for role inference
+		const providerMatch = cmd.match(/--provider\s+(\S+)/);
+		const modelMatch = cmd.match(/--model\s+(\S+)/);
+		const provider = providerMatch ? providerMatch[1] : "unknown";
+		const model = modelMatch ? modelMatch[1] : undefined;
+
+		// Generate a stable ID — use prompt file name or provider+counter
+		const name = rawName || `agent-${provider}`;
+		const id = `pidirect:${name}:${Date.now()}-${idCounter++}`;
+
+		if (state.children.has(id)) return;
+
+		addChild(state, id, name, "subagent");
+
+		// Enrich with model info
+		const child = state.children.get(id);
+		if (child && model) {
+			child.model = `${provider}/${model}`;
+		}
+
+		debugLog({ kind: "pi-direct-launch", name, provider, model });
+		ensureTick();
+	}
+
+	/** Handle completion of direct `pi --mode json` invocations */
+	function handlePiDirectEnd(cmd: string, isError: boolean) {
+		// Find matching pidirect: agent by prompt file name
+		const promptMatch = cmd.match(
+			/fork-prompt-(?:assembled-)?([a-zA-Z0-9_-]+)/,
+		);
+		const rawName = promptMatch ? promptMatch[1] : undefined;
+		const providerMatch = cmd.match(/--provider\s+(\S+)/);
+		const fallbackName = providerMatch
+			? `agent-${providerMatch[1]}`
+			: undefined;
+
+		let changed = false;
+		for (const [id, child] of state.children) {
+			if (child.status === "running" && id.startsWith("pidirect:")) {
+				if (
+					(rawName && id.includes(rawName)) ||
+					(!rawName && fallbackName && id.includes(fallbackName)) ||
+					(!rawName && !fallbackName)
+				) {
+					changed = isError
+						? markChildError(state, id)
+						: markChildDone(state, id) || changed;
+				}
+			}
+		}
+		if (changed) {
+			debugLog({ kind: "pi-direct-end", rawName, isError });
+			checkTickNeeded();
+		}
 	}
 
 	function handleResponse(cmd: string, isError: boolean) {
@@ -453,16 +523,22 @@ export default function (pi: ExtensionAPI) {
 			tickInterval = null;
 		}
 
+		// Counter to decouple spinner animation rate from stale check rate
+		let tickCount = 0;
+		const STALE_CHECK_INTERVAL = Math.round(5000 / TICK_MS); // ~every 5s
+
 		tickInterval = setInterval(() => {
 			const tickCtx = capturedCtx;
 			if (!tickCtx || state.children.size === 0) return;
 
-			// Advance spinner — re-render widget + footer for animation
+			tickCount++;
+
+			// Advance spinner — footer-only update (cheap)
 			advanceSpinner();
 
-			// Re-push widget for spinner animation when agents are running
 			const counts = getCounts(state);
 			if (counts.running > 0) {
+				// Re-render widget for spinner animation (elapsed + spinner icon)
 				const widgetLines = renderStatusLine(state, tickCtx.ui.theme);
 				if (widgetLines.length > 0) {
 					tickCtx.ui.setWidget(widgetId, widgetLines);
@@ -470,19 +546,21 @@ export default function (pi: ExtensionAPI) {
 				pushFooter(tickCtx);
 			}
 
-			// Stale timeout: state mutation — will trigger pushWidgetIfChanged
-			const staleCutoff = Date.now() - STALE_MS;
-			let staleFound = false;
-			for (const child of state.children.values()) {
-				if (child.status === "running" && child.startedAt < staleCutoff) {
-					markChildDone(state, child.id);
-					staleFound = true;
+			// Stale check at reduced rate (every ~5s, not every 80ms)
+			if (tickCount % STALE_CHECK_INTERVAL === 0) {
+				const staleCutoff = Date.now() - STALE_MS;
+				let staleFound = false;
+				for (const child of state.children.values()) {
+					if (child.status === "running" && child.startedAt < staleCutoff) {
+						markChildDone(state, child.id);
+						staleFound = true;
+					}
 				}
-			}
 
-			if (staleFound) {
-				debugLog({ kind: "tick.stale-cleanup" });
-				pushWidgetIfChanged(tickCtx, "tick.stale");
+				if (staleFound) {
+					debugLog({ kind: "tick.stale-cleanup" });
+					pushWidgetIfChanged(tickCtx, "tick.stale");
+				}
 			}
 
 			if (counts.running === 0) {
@@ -525,12 +603,14 @@ export default function (pi: ExtensionAPI) {
 
 	// ── Session lifecycle ───────────────────────────────────
 
-	pi.on("session_start", async (_event, ctx: ExtensionContext) => {
+	pi.on("session_start", async (_event: any, ctx: ExtensionContext) => {
 		capturedCtx = ctx;
 		state.children.clear();
 		pendingSubagentCalls.clear();
 		state.lastUpdate = Date.now();
 		lastStableHash = "";
+		resetSpinner();
+		resetModelCache();
 
 		if (tickInterval) {
 			clearInterval(tickInterval);
@@ -545,7 +625,8 @@ export default function (pi: ExtensionAPI) {
 		pushWidgetIfChanged(ctx, "session.start");
 	});
 
-	pi.on("session_switch", async (_event, ctx: ExtensionContext) => {
+	/*
+	pi.on("session_switch", async (_event: any, ctx: ExtensionContext) => {
 		capturedCtx = ctx;
 		state.children.clear();
 		pendingSubagentCalls.clear();
@@ -564,8 +645,9 @@ export default function (pi: ExtensionAPI) {
 		ctx.ui.setStatus(statusId, ctx.ui.theme.fg("dim", "agents: idle"));
 		pushWidgetIfChanged(ctx, "session.switch");
 	});
+*/
 
-	pi.on("session_shutdown", async (_event, _ctx: ExtensionContext) => {
+	pi.on("session_shutdown", async (_event: any, _ctx: ExtensionContext) => {
 		if (tickInterval) {
 			clearInterval(tickInterval);
 			tickInterval = null;
@@ -622,6 +704,12 @@ export default function (pi: ExtensionAPI) {
 				pushWidgetIfChanged(ctx, "tool_execution_start.launch");
 			}
 
+			// Detect direct pi --mode json invocations as subagent launches
+			if (PI_SUBAGENT_RE.test(cmd) && !LAUNCH_RE.test(cmd)) {
+				handlePiDirectLaunch(cmd);
+				pushWidgetIfChanged(ctx, "tool_execution_start.pi-direct");
+			}
+
 			if (event.toolCallId && cmd) {
 				bashCommandByCallId.set(event.toolCallId, cmd);
 			}
@@ -661,6 +749,10 @@ export default function (pi: ExtensionAPI) {
 			} else if (KILLALL_RE.test(cmd) && !event.isError) {
 				handleKillAll();
 				pushWidgetIfChanged(ctx, "tool_execution_end.kill-all");
+			} else if (PI_SUBAGENT_RE.test(cmd) && !LAUNCH_RE.test(cmd)) {
+				// Direct pi --mode json invocation completed
+				handlePiDirectEnd(cmd, event.isError === true);
+				pushWidgetIfChanged(ctx, "tool_execution_end.pi-direct");
 			} else if (FALLBACK_OUTPUT_READ && OUTPUT_FILE_RE.test(cmd)) {
 				handleOutputRead();
 				pushWidgetIfChanged(ctx, "tool_execution_end.fallback");

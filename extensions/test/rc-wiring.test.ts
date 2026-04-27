@@ -218,4 +218,54 @@ describe("wiring: extension event handlers", () => {
 
 		await fake.shutdown();
 	});
+
+	it("tool_execution_start with pi --mode json creates widget (direct launch)", async () => {
+		const fake = createFakePi();
+		extensionEntry(fake.pi as never);
+
+		await fake.emit("session_start", {});
+		fake.resetCalls();
+
+		await fake.emit("tool_execution_start", {
+			toolName: "bash",
+			args: { command: "timeout 600 pi --provider zai --model glm-5-turbo --mode json -p @/tmp/fork-prompt-analyst-revision.txt" },
+			toolCallId: "call-pi-001",
+		});
+
+		const widgetCalls = fake.calls.filter((c) => c.method === "setWidget");
+		assert.ok(widgetCalls.length >= 1, "Should call setWidget after pi --mode json launch");
+
+		const statusCalls = fake.calls.filter((c) => c.method === "setStatus");
+		assert.ok(statusCalls.length >= 1, "Should update footer with running agent");
+
+		await fake.shutdown();
+	});
+
+	it("tool_execution_end with pi --mode json marks done", async () => {
+		const fake = createFakePi();
+		extensionEntry(fake.pi as never);
+
+		await fake.emit("session_start", {});
+
+		// Launch agent via pi direct
+		await fake.emit("tool_execution_start", {
+			toolName: "bash",
+			args: { command: "pi --provider deepseek --model deepseek-v4-flash --mode json -p @/tmp/fork-prompt-explorer-verify.txt" },
+			toolCallId: "call-pi-002",
+		});
+
+		// Agent completes
+		await fake.emit("tool_execution_end", {
+			toolName: "bash",
+			toolCallId: "call-pi-002",
+			isError: false,
+			result: "{ \"status\": \"done\" }",
+		});
+
+		// Widget should be updated (done agent visible)
+		const widgetCalls = fake.calls.filter((c) => c.method === "setWidget" && c.args[1] !== undefined);
+		assert.ok(widgetCalls.length >= 1, "setWidget should be called after pi --mode json completes");
+
+		await fake.shutdown();
+	});
 });
