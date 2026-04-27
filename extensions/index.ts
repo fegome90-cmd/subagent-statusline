@@ -97,7 +97,11 @@ const KILLALL_RE = /tmux-live\s+kill-all/i;
 const STATUS_RE = /tmux-live\s+(?:progress|list)/i;
 
 // Detect direct pi --mode json invocations (subagent launches via bash)
-const PI_SUBAGENT_RE = /pi\s+.*--mode\s+json/i;
+// Matches: "pi --provider X --model Y --mode json" or "timeout ... pi ... --mode json"
+// Detect direct pi --mode json invocations (subagent launches via bash)
+// Must match 'pi' as a command, not as an argument to other tools
+const PI_SUBAGENT_RE =
+	/(?:^|;\s*|&&\s*\|\s*|`|timeout\s+\S+\s+|env\s+\S+\s+)pi\s+(?:\S+\s+)*--mode\s+json/i;
 
 const VALID_ROLES = [
 	"explorer",
@@ -623,7 +627,6 @@ export default function (pi: ExtensionAPI) {
 		pushWidgetIfChanged(ctx, "session.start");
 	});
 
-	// eslint-disable-next-line @typescript-eslint/no-explicit-any
 	pi.on("session_switch", async (_event: any, ctx: ExtensionContext) => {
 		capturedCtx = ctx;
 		state.children.clear();
